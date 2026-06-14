@@ -24,7 +24,7 @@ public class CitaController {
     @Autowired private PacienteRepository pacienteRepository;
     @Autowired private MedicoRepository medicoRepository;
 
-    // Método que ya tenías para listar las citas
+    // 1. OBTENER LAS CITAS DEL PACIENTE
     @GetMapping("/mis-citas")
     public ResponseEntity<List<Cita>> obtenerMisCitas(Authentication authentication) {
         String dniPaciente = authentication.getName();
@@ -32,28 +32,57 @@ public class CitaController {
         return ResponseEntity.ok(misCitas);
     }
 
-    // NUEVO MÉTODO: Para guardar una nueva cita
+    // 2. AGENDAR UNA NUEVA CITA
     @PostMapping("/agendar")
     public ResponseEntity<?> agendarCita(@RequestBody CitaRequest request, Authentication authentication) {
-        // 1. Identificar qué paciente está logueado
         String dniPaciente = authentication.getName();
         Paciente paciente = pacienteRepository.findByNumeroDocumento(dniPaciente)
                 .orElseThrow(() -> new RuntimeException("Paciente no encontrado"));
 
-        // 2. Buscar al médico seleccionado
         Medico medico = medicoRepository.findById(request.getIdMedico())
                 .orElseThrow(() -> new RuntimeException("Médico no encontrado"));
 
-        // 3. Crear y guardar la cita
         Cita nuevaCita = new Cita();
         nuevaCita.setPaciente(paciente);
         nuevaCita.setMedico(medico);
         nuevaCita.setFechaHora(LocalDateTime.parse(request.getFechaHora()));
         nuevaCita.setMotivoConsulta(request.getMotivoConsulta());
-        nuevaCita.setEstado("Confirmada"); // Se confirma automáticamente por ahora
+        nuevaCita.setEstado("Confirmada");
 
         citaRepository.save(nuevaCita);
 
         return ResponseEntity.ok().body("{\"mensaje\": \"Cita agendada exitosamente\"}");
+    }
+
+    // 3. CANCELAR UNA CITA
+    @PutMapping("/{id}/cancelar")
+    public ResponseEntity<?> cancelarCita(@PathVariable Integer id) {
+        Cita cita = citaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
+
+        cita.setEstado("Cancelada");
+        citaRepository.save(cita);
+
+        return ResponseEntity.ok().body("{\"mensaje\": \"Cita cancelada con éxito\"}");
+    }
+    // 4. OBTENER LA AGENDA DEL MÉDICO
+    @GetMapping("/agenda-medico")
+    public ResponseEntity<List<Cita>> obtenerAgendaMedico(Authentication authentication) {
+        // En este caso, el username logueado es el DNI del médico
+        String dniMedico = authentication.getName();
+        List<Cita> agenda = citaRepository.buscarCitasPorDniMedico(dniMedico);
+        return ResponseEntity.ok(agenda);
+    }
+
+    // 5. MARCAR CITA COMO ATENDIDA
+    @PutMapping("/{id}/atender")
+    public ResponseEntity<?> atenderCita(@PathVariable Integer id) {
+        Cita cita = citaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
+
+        cita.setEstado("Atendida");
+        citaRepository.save(cita);
+
+        return ResponseEntity.ok().body("{\"mensaje\": \"Paciente atendido con éxito\"}");
     }
 }
